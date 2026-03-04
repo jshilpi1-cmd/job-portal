@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Profile Job Portal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Job Portal MVP</p>
+          <h1>Search jobs that match your profile in Canada and the USA.</h1>
+          <p class="lede">
+            Reuse your current workflow: keep a profile keyword set, filter to the last 5 days or up to 30 days,
+            and sort by fit instead of reading every posting manually.
+          </p>
+        </div>
+        <div class="hero-card">
+          <div class="metric">
+            <span>Matches</span>
+            <strong>{{ stats.count }}</strong>
+          </div>
+          <div class="metric">
+            <span>Top Score</span>
+            <strong>{{ stats.top_score }}</strong>
+          </div>
+          <div class="metric">
+            <span>Date</span>
+            <strong>{{ today }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="filters">
+        <form method="post" enctype="multipart/form-data">
+          <label class="full">
+            <span>Profile keywords</span>
+            <textarea name="profile" rows="3">{{ filters.profile }}</textarea>
+          </label>
+
+          <label class="full">
+            <span>Upload resume (.pdf, .docx, .txt)</span>
+            <input type="file" name="resume_file" accept=".pdf,.docx,.txt">
+          </label>
+
+          <label class="full checkbox-row">
+            <input type="checkbox" name="use_resume_profile" value="1">
+            <span>Use uploaded resume to auto-generate profile keywords</span>
+          </label>
+
+          {% if upload_note %}
+            <p class="upload-note full">{{ upload_note }}</p>
+          {% endif %}
+
+          <label>
+            <span>Search text</span>
+            <input type="text" name="q" value="{{ filters.q }}" placeholder="splunk, systems analyst, pmo">
+          </label>
+
+          <label>
+            <span>Posted within</span>
+            <select name="days">
+              <option value="5" {% if filters.days == 5 %}selected{% endif %}>Last 5 days</option>
+              <option value="30" {% if filters.days == 30 %}selected{% endif %}>Last 30 days</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Country</span>
+            <select name="country">
+              <option value="all" {% if filters.country == "all" %}selected{% endif %}>US + Canada</option>
+              <option value="Canada" {% if filters.country == "Canada" %}selected{% endif %}>Canada</option>
+              <option value="USA" {% if filters.country == "USA" %}selected{% endif %}>USA</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Work mode</span>
+            <select name="mode">
+              <option value="all" {% if filters.mode == "all" %}selected{% endif %}>Any</option>
+              <option value="remote" {% if filters.mode == "remote" %}selected{% endif %}>Remote</option>
+              <option value="hybrid" {% if filters.mode == "hybrid" %}selected{% endif %}>Hybrid</option>
+              <option value="in person" {% if filters.mode == "in person" %}selected{% endif %}>In person</option>
+              <option value="onsite" {% if filters.mode == "onsite" %}selected{% endif %}>Onsite</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Track</span>
+            <select name="category">
+              <option value="all" {% if filters.category == "all" %}selected{% endif %}>All tracks</option>
+              <option value="SRE" {% if filters.category == "SRE" %}selected{% endif %}>SRE</option>
+              <option value="Observability" {% if filters.category == "Observability" %}selected{% endif %}>Observability</option>
+              <option value="PMO" {% if filters.category == "PMO" %}selected{% endif %}>PMO</option>
+              <option value="Business Analysis" {% if filters.category == "Business Analysis" %}selected{% endif %}>Business Analysis</option>
+              <option value="Systems Analyst" {% if filters.category == "Systems Analyst" %}selected{% endif %}>Systems Analyst</option>
+              <option value="ServiceNow" {% if filters.category == "ServiceNow" %}selected{% endif %}>ServiceNow</option>
+              <option value="Cybersecurity" {% if filters.category == "Cybersecurity" %}selected{% endif %}>Cybersecurity</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Sort</span>
+            <select name="sort">
+              <option value="best_fit" {% if filters.sort == "best_fit" %}selected{% endif %}>Best fit</option>
+              <option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Newest first</option>
+            </select>
+          </label>
+
+          <div class="actions">
+            <button type="submit">Apply filters</button>
+            <a href="{{ url_for('index') }}">Reset</a>
+          </div>
+        </form>
+      </section>
+
+      <section class="results">
+        {% if tailored %}
+          <div class="tailored-panel">
+            <h2>Tailored Drafts for {{ tailored.job_title }} at {{ tailored.company }}</h2>
+            <p>Edit these drafts directly, then copy into your final resume and cover letter files.</p>
+            <label>
+              <span>Resume Tailoring Draft</span>
+              <textarea rows="14">{{ tailored.resume_text }}</textarea>
+            </label>
+            <label>
+              <span>Cover Letter Draft</span>
+              <textarea rows="14">{{ tailored.cover_letter_text }}</textarea>
+            </label>
+          </div>
+        {% endif %}
+
+        {% if jobs %}
+          {% for item in jobs %}
+            <article class="card">
+              <div class="card-top">
+                <div>
+                  <p class="score">Fit {{ item.final_score }}/100</p>
+                  <h2>{{ item.job.title }}</h2>
+                  <p class="meta">{{ item.job.company }} • {{ item.job.location }} • {{ item.job.work_mode }}</p>
+                </div>
+                <div class="badges">
+                  <span>{{ item.job.category }}</span>
+                  <span>{{ item.age_days }} day{% if item.age_days != 1 %}s{% endif %} old</span>
+                </div>
+              </div>
+              <p class="summary">{{ item.job.summary }}</p>
+              <div class="terms">
+                {% for term in item.matched_terms %}
+                  <span>{{ term }}</span>
+                {% endfor %}
+              </div>
+              <div class="card-footer">
+                <span>{{ item.job.source }}</span>
+                <div class="card-actions">
+                  <form method="post">
+                    <input type="hidden" name="action" value="tailor_job">
+                    <input type="hidden" name="job_id" value="{{ item.job.id }}">
+                    <input type="hidden" name="profile" value="{{ filters.profile }}">
+                    <input type="hidden" name="q" value="{{ filters.q }}">
+                    <input type="hidden" name="days" value="{{ filters.days }}">
+                    <input type="hidden" name="country" value="{{ filters.country }}">
+                    <input type="hidden" name="mode" value="{{ filters.mode }}">
+                    <input type="hidden" name="category" value="{{ filters.category }}">
+                    <input type="hidden" name="sort" value="{{ filters.sort }}">
+                    <button type="submit" class="secondary-btn">Tailor Resume + Cover Letter</button>
+                  </form>
+                  <a href="{{ item.job.url }}" target="_blank" rel="noreferrer">Open job</a>
+                </div>
+              </div>
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="empty">
+            <h2>No jobs matched these filters.</h2>
+            <p>Try switching from 5 days to 30 days, or broaden the profile keywords.</p>
+          </div>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>
