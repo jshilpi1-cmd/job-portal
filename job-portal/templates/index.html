@@ -16,6 +16,9 @@
             Reuse your current workflow: keep a profile keyword set, filter to the last 5 days or up to 30 days,
             and sort by fit instead of reading every posting manually.
           </p>
+          <p class="lede">
+            Canada company feeds auto-sync daily around 11:00 AM MT.
+          </p>
         </div>
         <div class="hero-card">
           <div class="metric">
@@ -35,9 +38,35 @@
 
       <section class="filters">
         <form method="post" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="apply_filters">
           <label class="full">
             <span>Profile keywords</span>
             <textarea name="profile" rows="3">{{ filters.profile }}</textarea>
+          </label>
+
+          <label class="full">
+            <span>Your skill set (comma-separated)</span>
+            <input type="text" name="skills" value="{{ filters.skills }}" placeholder="python, splunk, servicenow, sql, aws">
+          </label>
+
+          <label class="full">
+            <span>Past job titles from resume (for title-based matching)</span>
+            <input type="text" name="resume_titles" value="{{ filters.resume_titles }}" placeholder="Senior Analyst, Systems Analyst, Monitoring Engineer">
+          </label>
+
+          <label>
+            <span>Desired position</span>
+            <select name="desired_role">
+              <option value="Any" {% if filters.desired_role == "Any" %}selected{% endif %}>Any</option>
+              <option value="AI Engineer" {% if filters.desired_role == "AI Engineer" %}selected{% endif %}>AI Engineer</option>
+              <option value="SRE" {% if filters.desired_role == "SRE" %}selected{% endif %}>SRE</option>
+              <option value="Observability Engineer" {% if filters.desired_role == "Observability Engineer" %}selected{% endif %}>Observability Engineer</option>
+              <option value="Senior Analyst" {% if filters.desired_role == "Senior Analyst" %}selected{% endif %}>Senior Analyst</option>
+              <option value="Application Analyst" {% if filters.desired_role == "Application Analyst" %}selected{% endif %}>Application Analyst</option>
+              <option value="Business Analyst" {% if filters.desired_role == "Business Analyst" %}selected{% endif %}>Business Analyst</option>
+              <option value="PMO Analyst" {% if filters.desired_role == "PMO Analyst" %}selected{% endif %}>PMO Analyst</option>
+              <option value="Cybersecurity Analyst" {% if filters.desired_role == "Cybersecurity Analyst" %}selected{% endif %}>Cybersecurity Analyst</option>
+            </select>
           </label>
 
           <label class="full">
@@ -63,6 +92,9 @@
             <span>Posted within</span>
             <select name="days">
               <option value="5" {% if filters.days == 5 %}selected{% endif %}>Last 5 days</option>
+              <option value="7" {% if filters.days == 7 %}selected{% endif %}>Last 7 days</option>
+              <option value="10" {% if filters.days == 10 %}selected{% endif %}>Last 10 days</option>
+              <option value="14" {% if filters.days == 14 %}selected{% endif %}>Last 14 days</option>
               <option value="30" {% if filters.days == 30 %}selected{% endif %}>Last 30 days</option>
             </select>
           </label>
@@ -73,6 +105,16 @@
               <option value="all" {% if filters.country == "all" %}selected{% endif %}>US + Canada</option>
               <option value="Canada" {% if filters.country == "Canada" %}selected{% endif %}>Canada</option>
               <option value="USA" {% if filters.country == "USA" %}selected{% endif %}>USA</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Company (Canada)</span>
+            <select name="company">
+              <option value="all" {% if filters.company == "all" %}selected{% endif %}>All companies</option>
+              {% for c in company_options %}
+                <option value="{{ c }}" {% if filters.company == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
             </select>
           </label>
 
@@ -98,6 +140,7 @@
               <option value="Systems Analyst" {% if filters.category == "Systems Analyst" %}selected{% endif %}>Systems Analyst</option>
               <option value="ServiceNow" {% if filters.category == "ServiceNow" %}selected{% endif %}>ServiceNow</option>
               <option value="Cybersecurity" {% if filters.category == "Cybersecurity" %}selected{% endif %}>Cybersecurity</option>
+              <option value="AI" {% if filters.category == "AI" %}selected{% endif %}>AI / ML</option>
             </select>
           </label>
 
@@ -123,12 +166,25 @@
             <p>Edit these drafts directly, then copy into your final resume and cover letter files.</p>
             <label>
               <span>Resume Tailoring Draft</span>
-              <textarea rows="14">{{ tailored.resume_text }}</textarea>
+              <textarea id="resume_text" rows="14">{{ tailored.resume_text }}</textarea>
             </label>
             <label>
               <span>Cover Letter Draft</span>
-              <textarea rows="14">{{ tailored.cover_letter_text }}</textarea>
+              <textarea id="cover_letter_text" rows="14">{{ tailored.cover_letter_text }}</textarea>
             </label>
+            <form method="post" action="{{ url_for('download_cover_letter') }}">
+              <input type="hidden" name="company" value="{{ tailored.company }}">
+              <input type="hidden" name="job_title" value="{{ tailored.job_title }}">
+              <input type="hidden" name="cover_letter_text" id="cover_letter_text_hidden">
+              <button type="submit" class="secondary-btn">Download Cover Letter (.txt)</button>
+            </form>
+            <form method="post" action="{{ url_for('download_application_package') }}">
+              <input type="hidden" name="company" value="{{ tailored.company }}">
+              <input type="hidden" name="job_title" value="{{ tailored.job_title }}">
+              <input type="hidden" name="resume_text" id="resume_text_hidden">
+              <input type="hidden" name="cover_letter_text" id="cover_letter_text_hidden_zip">
+              <button type="submit">Download Resume + Cover Letter (.zip)</button>
+            </form>
           </div>
         {% endif %}
 
@@ -137,7 +193,7 @@
             <article class="card">
               <div class="card-top">
                 <div>
-                  <p class="score">Fit {{ item.final_score }}/100</p>
+                  <p class="score">{{ item.fit_label }} • {{ item.final_score }}/100</p>
                   <h2>{{ item.job.title }}</h2>
                   <p class="meta">{{ item.job.company }} • {{ item.job.location }} • {{ item.job.work_mode }}</p>
                 </div>
@@ -159,9 +215,13 @@
                     <input type="hidden" name="action" value="tailor_job">
                     <input type="hidden" name="job_id" value="{{ item.job.id }}">
                     <input type="hidden" name="profile" value="{{ filters.profile }}">
+                    <input type="hidden" name="skills" value="{{ filters.skills }}">
+                    <input type="hidden" name="resume_titles" value="{{ filters.resume_titles }}">
+                    <input type="hidden" name="desired_role" value="{{ filters.desired_role }}">
                     <input type="hidden" name="q" value="{{ filters.q }}">
                     <input type="hidden" name="days" value="{{ filters.days }}">
                     <input type="hidden" name="country" value="{{ filters.country }}">
+                    <input type="hidden" name="company" value="{{ filters.company }}">
                     <input type="hidden" name="mode" value="{{ filters.mode }}">
                     <input type="hidden" name="category" value="{{ filters.category }}">
                     <input type="hidden" name="sort" value="{{ filters.sort }}">
@@ -180,5 +240,22 @@
         {% endif %}
       </section>
     </main>
+    <script>
+      const coverVisible = document.getElementById("cover_letter_text");
+      const coverHidden = document.getElementById("cover_letter_text_hidden");
+      const coverHiddenZip = document.getElementById("cover_letter_text_hidden_zip");
+      const resumeVisible = document.getElementById("resume_text");
+      const resumeHidden = document.getElementById("resume_text_hidden");
+      if (coverVisible && coverHidden && coverHiddenZip && resumeVisible && resumeHidden) {
+        const sync = () => {
+          coverHidden.value = coverVisible.value;
+          coverHiddenZip.value = coverVisible.value;
+          resumeHidden.value = resumeVisible.value;
+        };
+        sync();
+        coverVisible.addEventListener("input", sync);
+        resumeVisible.addEventListener("input", sync);
+      }
+    </script>
   </body>
 </html>
