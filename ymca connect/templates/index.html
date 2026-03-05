@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YMCA Connect</title>
+    <style>
+      body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; background: #f6f8fa; color: #1f2937; }
+      .wrap { max-width: 980px; margin: 0 auto; }
+      .card { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      label { display: block; font-size: 13px; margin-bottom: 6px; }
+      input { width: 100%; padding: 9px; border: 1px solid #cbd5e1; border-radius: 8px; }
+      .actions { margin-top: 12px; display: flex; gap: 10px; }
+      button { border: none; background: #0b63ce; color: #fff; padding: 10px 14px; border-radius: 8px; cursor: pointer; }
+      .secondary { background: #374151; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 10px 8px; font-size: 14px; }
+      .note { color: #065f46; font-weight: 600; }
+      .error { color: #991b1b; font-weight: 600; }
+      .small { font-size: 12px; color: #4b5563; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1>YMCA Connect</h1>
+        <p class="small">Search and book classes with API defaults for Seton Calgary Zumba Thursday 6:00-7:00 PM.</p>
+      </section>
+
+      <section class="card">
+        <form method="post">
+          <input type="hidden" name="action" value="search">
+          <div class="grid">
+            <div>
+              <label>Person name</label>
+              <input type="text" name="participant_name" value="{{ prefs.participant_name }}">
+            </div>
+            <div>
+              <label>Location</label>
+              <input type="text" name="location" value="{{ prefs.location }}">
+            </div>
+            <div>
+              <label>Class</label>
+              <input type="text" name="class_name" value="{{ prefs.class_name }}">
+            </div>
+            <div>
+              <label>Day</label>
+              <input type="text" name="day_of_week" value="{{ prefs.day_of_week }}">
+            </div>
+            <div>
+              <label>Start time (24h)</label>
+              <input type="text" name="start_time" value="{{ prefs.start_time }}">
+            </div>
+            <div>
+              <label>End time (24h)</label>
+              <input type="text" name="end_time" value="{{ prefs.end_time }}">
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit">Search Classes</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Schedule Booking</h2>
+        <p class="small">Creates a Windows Task Scheduler job that runs <code>book_once.py</code> automatically. All times are Mountain Time (MT).</p>
+        <form method="post">
+          <input type="hidden" name="action" value="schedule">
+          <div class="grid">
+            <div>
+              <label>Task name</label>
+              <input type="text" name="task_name" value="{{ schedule.task_name }}">
+            </div>
+            <div>
+              <label>Day (MON/TUE/WED/THU/FRI/SAT/SUN)</label>
+              <input type="text" name="schedule_day" value="{{ schedule.day }}">
+            </div>
+            <div>
+              <label>Time MT (HH:MM 24h)</label>
+              <input type="text" name="schedule_time" value="{{ schedule.time }}">
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit">Create Schedule</button>
+          </div>
+        </form>
+      </section>
+
+      {% if note %}
+        <section class="card"><p class="note">{{ note }}</p></section>
+      {% endif %}
+      {% if error %}
+        <section class="card"><p class="error">{{ error }}</p></section>
+      {% endif %}
+      {% if last_booking_status %}
+        <section class="card">
+          <h2>Last Automation Run</h2>
+          <p><strong>Status:</strong> {{ last_booking_status.status }}</p>
+          <p><strong>Message:</strong> {{ last_booking_status.message }}</p>
+          <p><strong>Step:</strong> {{ last_booking_status.step }}</p>
+          <p class="small"><strong>Time (UTC):</strong> {{ last_booking_status.timestamp_utc }}</p>
+        </section>
+      {% endif %}
+
+      {% if classes %}
+        <section class="card">
+          <h2>Available classes</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th>Location</th>
+                <th>Day</th>
+                <th>Time</th>
+                <th>Instructor</th>
+                <th>Spots</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in classes %}
+                <tr>
+                  <td>{{ item.name }}</td>
+                  <td>{{ item.location }}</td>
+                  <td>{{ item.day_of_week }}</td>
+                  <td>{{ item.start_time }} - {{ item.end_time }}</td>
+                  <td>{{ item.instructor }}</td>
+                  <td>{{ item.spots_left }}</td>
+                  <td>
+                    <form method="post">
+                      <input type="hidden" name="action" value="book">
+                      <input type="hidden" name="class_id" value="{{ item.class_id }}">
+                      <input type="hidden" name="participant_name" value="{{ prefs.participant_name }}">
+                      <input type="hidden" name="location" value="{{ prefs.location }}">
+                      <input type="hidden" name="class_name" value="{{ prefs.class_name }}">
+                      <input type="hidden" name="day_of_week" value="{{ prefs.day_of_week }}">
+                      <input type="hidden" name="start_time" value="{{ prefs.start_time }}">
+                      <input type="hidden" name="end_time" value="{{ prefs.end_time }}">
+                      <button class="secondary" type="submit">Book</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </section>
+      {% endif %}
+    </main>
+  </body>
+</html>
